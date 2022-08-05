@@ -1,8 +1,7 @@
-#[cfg(not(target_os = "linux"))]
-compile_error!("only linux is supported");
-
 use thiserror::Error;
 
+#[cfg(feature = "async")]
+pub mod async_api;
 mod client;
 mod protocol;
 

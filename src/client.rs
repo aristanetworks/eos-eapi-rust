@@ -15,10 +15,10 @@ pub enum Error {
 }
 
 pub struct Client {
-    request: UnixStream,
-    response: UnixStream,
-    _signal: UnixStream,
-    _stats: UnixStream,
+    pub request: UnixStream,
+    pub response: UnixStream,
+    pub _signal: UnixStream,
+    pub _stats: UnixStream,
 }
 
 fn send_fd<T: AsRawFd>(socket: RawFd, fd: T) -> Result<(), Error> {
@@ -37,14 +37,9 @@ fn send_fd<T: AsRawFd>(socket: RawFd, fd: T) -> Result<(), Error> {
     Ok(())
 }
 
-fn make_string_iov<'a>(s: &'a [u8], buf: &'a mut [u8; 4]) -> [std::io::IoSlice<'a>; 2] {
-    buf.clone_from(&(s.len() as i32).to_le_bytes());
-    [std::io::IoSlice::new(buf), std::io::IoSlice::new(s)]
-}
-
 fn send_string<T: AsRef<[u8]>>(socket: RawFd, s: T) -> Result<(), Error> {
     let mut buf = [0; 4];
-    let iov = make_string_iov(s.as_ref(), &mut buf);
+    let iov = protocol::make_string(s.as_ref(), &mut buf);
     sys::socket::sendmsg::<()>(socket, &iov, &[], sys::socket::MsgFlags::empty(), None)?;
 
     Ok(())
@@ -65,7 +60,10 @@ impl Client {
 
         sys::socket::connect(
             socket,
+            #[cfg(target_os = "linux")]
             &sys::socket::UnixAddr::new_abstract(socket_name.as_bytes())?,
+            #[cfg(any(test, not(target_os = "linux")))]
+            &sys::socket::UnixAddr::new(socket_name.as_bytes())?,
         )?;
 
         let signal = UnixStream::pair()?;
@@ -111,7 +109,7 @@ impl Client {
         let mut buf = [0; 4];
         let n = self
             .request
-            .write_vectored(&make_string_iov(request.as_bytes(), &mut buf))?;
+            .write_vectored(&protocol::make_string(request.as_bytes(), &mut buf))?;
         if n < buf.len() + request.len() {
             return Err(Error::IncompleteWrite);
         }

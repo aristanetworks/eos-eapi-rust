@@ -144,6 +144,11 @@ pub fn parse_request(result: &[u8]) -> Result<Response, Error> {
     ))
 }
 
+pub fn make_string<'a>(s: &'a [u8], buf: &'a mut [u8; 4]) -> [std::io::IoSlice<'a>; 2] {
+    buf.clone_from(&(s.len() as i32).to_le_bytes());
+    [std::io::IoSlice::new(buf), std::io::IoSlice::new(s)]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -277,6 +282,17 @@ mod tests {
             parse_request(input.as_bytes()),
             Err(Error::InvalidJSON(_))
         ));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_make_string() -> Result<(), Box<dyn std::error::Error>> {
+        let s = "yolo".as_bytes();
+        let mut buf = [0; 4];
+        let v = make_string(s, &mut buf);
+        assert_eq!(*v[0], (s.len() as i32).to_le_bytes());
+        assert_eq!(*v[1], *s);
 
         Ok(())
     }

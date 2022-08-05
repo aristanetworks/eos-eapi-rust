@@ -9,4 +9,15 @@ edition = "2021"
 nix = { version = "0.24", features = ["socket", "uio", "user"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+tokio = { version = "1.20", features = ["io-util", "net", "rt"], optional=true }
 thiserror = "1.0"
+
+[dev-dependencies]
+tokio = { version = "1.20", features = ["macros", "rt-multi-thread"] }
+
+[features]
+async = ["dep:tokio"]
+
+[[example]]
+name = "async_cli"
+required-features = ["async"]
