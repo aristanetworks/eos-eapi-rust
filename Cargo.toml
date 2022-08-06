@@ -2,6 +2,9 @@
 name = "eos-capi"
 version = "0.1.0"
 edition = "2021"
+license = "Apache-2.0"
+categories = [ "api-bindings" ]
+description = "Arista EOS eAPI client library"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
