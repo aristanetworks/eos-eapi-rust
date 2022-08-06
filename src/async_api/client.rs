@@ -41,9 +41,13 @@ impl std::convert::TryFrom<SyncClient> for Client {
 }
 
 impl Client {
-    pub async fn connect<T: AsRef<str>>(sysname: T) -> Result<Self, Error> {
-        let sysname = sysname.as_ref().to_owned();
-        tokio::task::spawn_blocking(|| SyncClient::connect(sysname))
+    pub async fn connect<T1: AsRef<str>, T2: AsRef<str>>(
+        sysname: T1,
+        socket_name: T2,
+    ) -> Result<Self, Error> {
+        let sysname = sysname.as_ref().to_string();
+        let socket_name = socket_name.as_ref().to_string();
+        tokio::task::spawn_blocking(|| SyncClient::connect(sysname, socket_name))
             .await??
             .try_into()
     }

@@ -22,7 +22,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let result = async_api::eapi_run(None, &args, format).await?;
-    println!("{:?}", result);
+    match result {
+        Response::Result(v) => println!("{v:?}"),
+        Response::Error {
+            message,
+            code,
+            errors,
+        } => println!("error code: {code}, message: {message}, outputs: {errors:#?}"),
+    };
 
     Ok(())
 }

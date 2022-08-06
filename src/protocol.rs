@@ -99,7 +99,7 @@ pub fn make_run_request<T: AsRef<str>>(cmds: &[T], format: ResultFormat) -> Stri
     .to_string()
 }
 
-pub fn parse_request(result: &[u8]) -> Result<Response, Error> {
+pub fn parse_response(result: &[u8]) -> Result<Response, Error> {
     let response: serde_json::Value = serde_json::from_slice(result)?;
     if let Some(error) = response.get("error") {
         let message = error
@@ -230,13 +230,13 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_request() -> Result<(), Box<dyn std::error::Error>> {
-        let mut input = r#"{
+    fn test_parse_response() -> Result<(), Box<dyn std::error::Error>> {
+        let input = r#"{
             "jsonrpc": "2.0",
             "result": ["test1", "test2", {"a": "b"}],
             "id": "1"
         }"#;
-        let mut result = parse_request(input.as_bytes())?;
+        let result = parse_response(input.as_bytes())?;
         assert_eq!(
             result,
             Response::Result(vec![
@@ -246,7 +246,7 @@ mod tests {
             ])
         );
 
-        input = r#"{
+        let input = r#"{
             "jsonrpc": "2.0",
             "error": {
                 "message": "error message",
@@ -255,7 +255,7 @@ mod tests {
             },
             "id": "1"
         }"#;
-        result = parse_request(input.as_bytes())?;
+        let result = parse_response(input.as_bytes())?;
         assert_eq!(
             result,
             Response::Error {
@@ -265,21 +265,21 @@ mod tests {
             }
         );
 
-        input = r#"{
+        let input = r#"{
             "jsonrpc": "2.0",
             "id": "1"
         }"#;
         assert!(matches!(
-            parse_request(input.as_bytes()),
+            parse_response(input.as_bytes()),
             Err(Error::MalformedResponse(_))
         ));
 
-        input = r#"{
+        let input = r#"{
             "jsonrpc": "2.0,
             "id": "1"
         }"#;
         assert!(matches!(
-            parse_request(input.as_bytes()),
+            parse_response(input.as_bytes()),
             Err(Error::InvalidJSON(_))
         ));
 

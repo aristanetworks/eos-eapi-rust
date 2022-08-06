@@ -46,8 +46,10 @@ fn send_string<T: AsRef<[u8]>>(socket: RawFd, s: T) -> Result<(), Error> {
 }
 
 impl Client {
-    pub fn connect<T: AsRef<str>>(sysname: T) -> Result<Self, Error> {
-        let socket_name = protocol::make_socket_name(&sysname);
+    pub fn connect<T1: AsRef<str>, T2: AsRef<str>>(
+        sysname: T1,
+        socket_name: T2,
+    ) -> Result<Self, Error> {
         let args = protocol::make_args(&sysname);
         let env = protocol::make_env()?;
 
@@ -60,10 +62,10 @@ impl Client {
 
         sys::socket::connect(
             socket,
-            #[cfg(target_os = "linux")]
-            &sys::socket::UnixAddr::new_abstract(socket_name.as_bytes())?,
+            #[cfg(all(not(test), target_os = "linux"))]
+            &sys::socket::UnixAddr::new_abstract(socket_name.as_ref().as_bytes())?,
             #[cfg(any(test, not(target_os = "linux")))]
-            &sys::socket::UnixAddr::new(socket_name.as_bytes())?,
+            &sys::socket::UnixAddr::new(socket_name.as_ref().as_bytes())?,
         )?;
 
         let signal = UnixStream::pair()?;
