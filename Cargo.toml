@@ -1,8 +1,8 @@
 [package]
-name = "eos-capi"
+name = "eos-eapi"
 version = "0.1.0"
 edition = "2021"
-license = "Apache-2.0"
+license = "BSD-3-Clause"
 categories = [ "api-bindings" ]
 description = "Arista EOS eAPI client library"
 

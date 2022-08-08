@@ -1,4 +1,4 @@
-use eos_capi::*;
+use eos_eapi::*;
 
 static USAGE: &str = "usage: cli [-t|-j] cmd1 [cmd2...]";
 
