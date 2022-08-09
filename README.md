@@ -6,7 +6,7 @@ Rust programs.
 ---
 ```toml
 [dependencies]
-eos_eapi = "0.1"
+eos-eapi = "0.1"
 ```
 
 # Example
