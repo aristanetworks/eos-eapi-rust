@@ -13,7 +13,7 @@ eos-eapi = "0.1"
 
 API usage example:
 ```
-let result = eapi_run(None, &["show clock", "show aliases"], ResultFormat::Json);
+let result = eapi_run(None, &["show clock", "show aliases"], ResultFormat::Json)?;
 match result {
     Response::Result(v) => println!("{v:?}"),
     Response::Error {
