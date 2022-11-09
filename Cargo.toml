@@ -1,6 +1,6 @@
 [package]
 name = "eos-eapi"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 license = "BSD-3-Clause"
 repository = "https://github.com/aristanetworks/eos-eapi-rust"
@@ -15,13 +15,24 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.20", features = ["io-util", "net", "rt"], optional=true }
 thiserror = "1.0"
+base64 = "0.13"
+ureq = { version = "2.5", optional = true }
+rustls = { version = "0.20", features = ["dangerous_configuration"] }
+hyper = { version = "0.14", features = ["client", "http1"], optional = true }
+hyper-rustls = { version = "0.23", optional = true }
+async-trait = { version = "0.1.58", optional = true }
 
 [dev-dependencies]
-tokio = { version = "1.20", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.20", features = ["macros", "rt-multi-thread", "sync"] }
+hyper = { version = "0.14", features = ["server", "http1", "tcp"] }
+clap = { version = "4.0", features = ["derive"] }
+env_logger = "0.9"
 tempfile = "3"
 
 [features]
-async = ["dep:tokio"]
+default = ["blocking"]
+async = ["dep:tokio", "dep:async-trait", "dep:hyper", "dep:hyper-rustls"]
+blocking = ["dep:ureq"]
 
 [[example]]
 name = "async_cli"

@@ -42,13 +42,23 @@ pub enum Error {
     IO(#[from] std::io::Error),
     #[error("incomplete write")]
     IncompleteWrite,
+    #[error("Invalid HTTP status {0}")]
+    HttpStatus(u16),
+    #[error("HTTP error: {0}")]
+    #[cfg(feature = "blocking")]
+    Http(#[from] Box<ureq::Error>),
 }
 
-pub struct Client {
-    pub request: UnixStream,
-    pub response: UnixStream,
-    pub _signal: UnixStream,
-    pub _stats: UnixStream,
+pub trait Requester {
+    fn do_request<T: AsRef<str>>(self, request: T) -> Result<Vec<u8>, Error>;
+}
+
+#[doc(hidden)]
+pub struct UdsClient {
+    pub(crate) request: UnixStream,
+    pub(crate) response: UnixStream,
+    pub(crate) _signal: UnixStream,
+    pub(crate) _stats: UnixStream,
 }
 
 fn send_fd<T: AsRawFd>(socket: RawFd, fd: T) -> Result<(), Error> {
@@ -75,8 +85,8 @@ fn send_string<T: AsRef<[u8]>>(socket: RawFd, s: T) -> Result<(), Error> {
     Ok(())
 }
 
-impl Client {
-    pub fn connect<T1: AsRef<str>, T2: AsRef<str>>(
+impl UdsClient {
+    pub(crate) fn connect<T1: AsRef<str>, T2: AsRef<str>>(
         sysname: T1,
         socket_name: T2,
     ) -> Result<Self, Error> {
@@ -135,8 +145,10 @@ impl Client {
             _stats: stats,
         })
     }
+}
 
-    pub fn do_request<T: AsRef<str>>(&mut self, request: T) -> Result<Vec<u8>, Error> {
+impl Requester for UdsClient {
+    fn do_request<T: AsRef<str>>(mut self, request: T) -> Result<Vec<u8>, Error> {
         let request = request.as_ref();
         let mut buf = [0; 4];
         let n = self
@@ -150,5 +162,104 @@ impl Client {
         self.response.read_to_end(&mut buf)?;
 
         Ok(buf)
+    }
+}
+
+#[cfg(feature = "blocking")]
+fn make_agent_builder(timeout: std::time::Duration) -> ureq::AgentBuilder {
+    ureq::AgentBuilder::new().timeout(timeout)
+}
+
+struct DisableCertVerification;
+impl rustls::client::ServerCertVerifier for DisableCertVerification {
+    fn verify_server_cert(
+        &self,
+        _: &rustls::Certificate,
+        _: &[rustls::Certificate],
+        _: &rustls::ServerName,
+        _: &mut dyn Iterator<Item = &[u8]>,
+        _: &[u8],
+        _: std::time::SystemTime,
+    ) -> Result<rustls::client::ServerCertVerified, rustls::Error> {
+        Ok(rustls::client::ServerCertVerified::assertion())
+    }
+}
+
+pub fn make_insecure_tls_config() -> rustls::ClientConfig {
+    rustls::ClientConfig::builder()
+        .with_safe_defaults()
+        .with_custom_certificate_verifier(std::sync::Arc::new(DisableCertVerification))
+        .with_no_client_auth()
+}
+
+pub fn make_auth_header(auth: Option<(String, String)>) -> Option<String> {
+    auth.as_ref()
+        .map(|(user, pass)| "Basic ".to_owned() + &base64::encode(user.to_owned() + ":" + pass))
+}
+
+pub fn make_url(hostname: String, https: bool) -> String {
+    let t = if https { "https://" } else { "http://" };
+    t.to_owned() + &hostname + "/command-api"
+}
+
+#[doc(hidden)]
+#[cfg(feature = "blocking")]
+pub struct HttpClient {
+    agent: ureq::Agent,
+    url: String,
+    auth: Option<String>,
+}
+
+#[cfg(feature = "blocking")]
+impl HttpClient {
+    pub(crate) fn new_http(
+        hostname: String,
+        auth: Option<(String, String)>,
+        timeout: std::time::Duration,
+    ) -> Self {
+        Self {
+            agent: make_agent_builder(timeout).build(),
+            url: make_url(hostname, false),
+            auth: make_auth_header(auth),
+        }
+    }
+
+    pub(crate) fn new_https(
+        hostname: String,
+        auth: Option<(String, String)>,
+        timeout: std::time::Duration,
+        insecure: bool,
+    ) -> Self {
+        let mut b = make_agent_builder(timeout).https_only(true);
+        if insecure {
+            b = b.tls_config(std::sync::Arc::new(make_insecure_tls_config()));
+        }
+        Self {
+            agent: b.build(),
+            url: make_url(hostname, true),
+            auth: make_auth_header(auth),
+        }
+    }
+}
+
+#[cfg(feature = "blocking")]
+impl Requester for &HttpClient {
+    fn do_request<T: AsRef<str>>(self, request: T) -> Result<Vec<u8>, Error> {
+        let mut req = self
+            .agent
+            .post(&self.url)
+            .set("Content-type", "application/json");
+        if let Some(v) = &self.auth {
+            req = req.set("Authorization", v);
+        }
+
+        let resp = req.send_string(request.as_ref()).map_err(Box::new)?;
+        if resp.status() < 200 || resp.status() > 299 {
+            return Err(Error::HttpStatus(resp.status()));
+        }
+        let mut r = Vec::new();
+        resp.into_reader().read_to_end(&mut r)?;
+
+        Ok(r)
     }
 }

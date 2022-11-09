@@ -28,29 +28,98 @@
 // OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
 // IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+use clap::{Parser, Subcommand, ValueEnum};
 use eos_eapi::*;
 
-static USAGE: &str = "usage: cli [-t|-j] cmd1 [cmd2...]";
+#[derive(Subcommand)]
+enum Commands {
+    /// Connect via unix domain socket
+    Uds {
+        #[arg(required = true)]
+        commands: Vec<String>,
+    },
+    /// Connect via HTTP
+    Http {
+        hostname: String,
+        #[arg(short, long, requires = "password")]
+        user: Option<String>,
+        #[arg(short, long, requires = "user")]
+        password: Option<String>,
+        #[arg(required = true)]
+        commands: Vec<String>,
+    },
+    /// Connect via HTTPS
+    Https {
+        /// Skip certification validation
+        #[arg(short = 'k', long)]
+        insecure: bool,
+        hostname: String,
+        #[arg(short, long, requires = "password")]
+        user: Option<String>,
+        #[arg(short, long, requires = "user")]
+        password: Option<String>,
+        #[arg(required = true)]
+        commands: Vec<String>,
+    },
+}
+
+#[derive(ValueEnum, Clone)]
+enum Format {
+    Json,
+    Text,
+}
+
+#[derive(Parser)]
+struct Args {
+    #[command(subcommand)]
+    subcmd: Commands,
+    /// Results format
+    #[arg(short, long, default_value = "text")]
+    format: Format,
+}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut format = ResultFormat::default();
+    env_logger::init();
+    let args = Args::parse();
 
-    let mut args: Vec<String> = std::env::args().skip(1).collect();
-    if args.len() > 0 && args[0].starts_with('-') {
-        if args[0] == "-t" {
-            format = ResultFormat::Text;
-        } else if args[0] == "-j" {
-            format = ResultFormat::Json;
+    let format = match args.format {
+        Format::Json => ResultFormat::Json,
+        Format::Text => ResultFormat::Text,
+    };
+
+    let result = match args.subcmd {
+        Commands::Uds { commands } => ClientBuilder::unix_socket()
+            .build_blocking()?
+            .run(&commands, format)?,
+        Commands::Http {
+            hostname,
+            user,
+            password,
+            commands,
+        } => if let (Some(user), Some(password)) = (user, password) {
+            ClientBuilder::http(hostname).set_authentication(user, password)
         } else {
-            return Err(USAGE.into());
+            ClientBuilder::http(hostname)
         }
-        args.remove(0);
-    }
-    if args.len() < 1 {
-        return Err(USAGE.into());
-    }
+        .build_blocking()
+        .run(&commands, format)?,
+        Commands::Https {
+            insecure,
+            hostname,
+            user,
+            password,
+            commands,
+        } => if let (Some(user), Some(password)) = (user, password) {
+            ClientBuilder::http(hostname).set_authentication(user, password)
+        } else {
+            ClientBuilder::http(hostname)
+        }
+        .enable_https()
+        .set_insecure(insecure)
+        .build_blocking()
+        .run(&commands, format)?,
+    };
 
-    let result = eapi_run(None, &args, format)?;
     match result {
         Response::Result(v) => println!("{v:?}"),
         Response::Error {
@@ -59,6 +128,5 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             errors,
         } => println!("error code: {code}, message: {message}, outputs: {errors:#?}"),
     };
-
     Ok(())
 }
