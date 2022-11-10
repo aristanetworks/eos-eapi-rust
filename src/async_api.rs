@@ -50,7 +50,7 @@
 //! # Example using HTTP
 //! The HTTP(S) client can be reused to run multiple sets of commands.
 //! ```no_run
-//! let result = ClientBuilder::unix_http("localhost")
+//! let result = ClientBuilder::http("localhost")
 //!                 .set_authentication("admin".to_owned(), "pass".to_owned())
 //!                 .build_async()
 //!                 .run(&["show clock", "show aliases"], ResultFormat::Json)
@@ -67,7 +67,7 @@
 //!
 //! # Example using HTTPS
 //! ```no_run
-//! let result = ClientBuilder::unix_http("localhost")
+//! let result = ClientBuilder::http("localhost")
 //!                 .enable_https()
 //!                 .set_authentication("admin".to_owned(), "pass".to_owned())
 //!                 .build_async()

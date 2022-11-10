@@ -29,7 +29,7 @@ match result {
 
 API usage example via HTTP:
 ```
-let result = ClientBuilder::unix_http("localhost")
+let result = ClientBuilder::http("localhost")
                 .set_authentication("admin".to_owned(), "pass".to_owned())
                 .build_blocking()
                 .run(&["show clock", "show aliases"], ResultFormat::Json)?;
